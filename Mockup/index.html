@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Orange Eclipse — Stock Game Mock</title>
+<style>
+  :root { --teal:#0fb; --orange:#ff7a00; --ink:#222; --muted:#ddd; --bg:#fafafa; }
+  html,body { margin:0; padding:0; background:#fff; color:var(--ink); font:16px/1.4 system-ui, sans-serif; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 16px; }
+  h1,h2,h3 { margin: 8px 0; }
+  label { display:block; margin: 8px 0 4px; }
+  input, button { font:inherit; padding:8px; }
+  button { cursor:pointer; border:1px solid var(--ink); background:#fff; }
+  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .card { border:1px solid var(--muted); padding:12px; border-radius:6px; background:var(--bg); }
+  .stack { display:flex; flex-direction:column; gap:8px; }
+  .toolbar { display:flex; gap:8px; flex-wrap:wrap; }
+  .accent { border-color: var(--teal); }
+  .cta { background: var(--orange); border-color: var(--orange); color:#fff; }
+  .ghost { background:#fff; }
+  .muted { color:#666; }
+  .spacer { height:12px; }
+  .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  .grid3 { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; }
+  .hidden { display:none !important; }
+
+  /* Modal */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+    display:flex; align-items:center; justify-content:center; }
+  .modal { background:#fff; border:1px solid var(--muted); border-radius:8px; width: min(720px, 92vw); padding:16px; }
+
+  /* Placeholder blocks */
+  .placeholder { height: 100px; border:1px dashed var(--muted); background:#fff; display:flex; align-items:center; justify-content:center; color:#999; }
+
+  section { margin: 16px auto; }
+  hr { border:none; border-top:1px solid var(--muted); margin:12px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- HEADER -->
+  <header class="row" style="justify-content:flex-start; align-items:center; gap:12px;">
+    <!-- Logo -->
+    <img src="images/logo.png" alt="Orange Eclipse Logo" style="height:48px; width:auto; border-radius:6px;">
+    <h1 style="margin:0;">
+      <strong>Orange Eclipse</strong> <span class="muted">— Stock Simulator (Bare Bones)</span>
+    </h1>
+  </header>
+
+  <!-- START SCREEN -->
+  <section id="screen-start">
+    <div class="card stack">
+      <h2>Start Screen</h2>
+      <p class="muted">Enter a ticker symbol to begin. No data or login needed.</p>
+      <div class="row">
+        <div class="stack" style="min-width:280px;">
+          <label for="ticker">Ticker Symbol</label>
+          <input id="ticker" placeholder="e.g., AAPL" />
+        </div>
+        <button class="cta" onclick="goMain()">Start Game</button>
+      </div>
+      <hr />
+      <ul class="muted">
+        <li>Purpose: collect ticker symbol</li>
+        <li>Transitions to Main Game screen</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- MAIN GAME SCREEN -->
+  <section id="screen-main" class="hidden">
+    <div class="card stack">
+      <h2>Main Game Screen</h2>
+
+      <div class="grid3">
+        <div class="card"><strong>Bank</strong><div>$ —</div></div>
+        <div class="card"><strong>Investment</strong><div>$ —</div></div>
+        <div class="card"><strong>Current Price</strong><div>$ —</div></div>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="placeholder">Trend / Chart Placeholder</div>
+
+      <div class="spacer"></div>
+      <div class="toolbar">
+        <button class="accent" onclick="openTrade('buy')">Buy</button>
+        <button class="accent" onclick="openTrade('sell')">Sell</button>
+        <button class="ghost" onclick="nextDay()">Hold (Next Day)</button>
+        <button class="ghost" onclick="quitGame()">Quit</button>
+      </div>
+
+      <hr />
+      <ul class="muted">
+        <li>Purpose: show layout of controls</li>
+        <li>No calculations — just navigation</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- BUY/SELL POPUP -->
+  <div id="modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="tradeTitle">
+    <div class="modal stack">
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <h3 id="tradeTitle">Trade</h3>
+        <button onclick="closeTrade()">×</button>
+      </div>
+      <p class="muted">Three input styles (demo only).</p>
+
+      <div class="grid3">
+        <div class="card stack">
+          <strong>Amount (textbox)</strong>
+          <input id="txtAmount" type="number" min="0" step="1" value="0" oninput="syncFrom('text')" />
+        </div>
+        <div class="card stack">
+          <strong>Amount (slider)</strong>
+          <input id="sldAmount" type="range" min="0" max="100" value="0" oninput="syncFrom('slider')" />
+        </div>
+        <div class="card stack" style="text-align:center;">
+          <strong>Proportion (circle)</strong>
+          <div class="placeholder" style="height:160px;">Pie Placeholder</div>
+          <small class="muted">Visual only</small>
+        </div>
+      </div>
+
+      <div class="toolbar" style="justify-content:flex-end;">
+        <button class="ghost" onclick="closeTrade()">Cancel</button>
+        <button class="cta" onclick="confirmTrade()">Confirm</button>
+      </div>
+      <p class="muted" style="margin:0;">Confirm simply closes this popup.</p>
+    </div>
+  </div>
+
+  <!-- RESULTS SCREEN -->
+  <section id="screen-results" class="hidden">
+    <div class="card stack">
+      <h2>Results</h2>
+      <div class="grid2">
+        <div class="card"><strong>Overall Gain/Loss</strong><div>—</div></div>
+        <div class="card"><strong>Elapsed Period</strong><div>—</div></div>
+      </div>
+      <hr />
+      <div class="toolbar">
+        <button class="accent" onclick="restart()">Play Again</button>
+        <button class="ghost" onclick="goStart()">Back to Start</button>
+      </div>
+      <ul class="muted">
+        <li>Purpose: show final screen layout</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+  const $ = s => document.querySelector(s);
+  const screens = ['#screen-start', '#screen-main', '#screen-results'];
+  function show(id){ screens.forEach(s => $(s).classList.add('hidden')); $(id).classList.remove('hidden'); }
+  function goStart(){ show('#screen-start'); }
+  function goMain(){ show('#screen-main'); }
+  function nextDay(){ alert('Advance to next day (demo only)'); }
+  function quitGame(){ show('#screen-results'); }
+  function restart(){ show('#screen-main'); }
+
+  function openTrade(mode){ $('#tradeTitle').textContent = (mode==='sell'?'Sell':'Buy') + ' — Amount'; $('#modal').classList.remove('hidden'); }
+  function closeTrade(){ $('#modal').classList.add('hidden'); }
+  function confirmTrade(){ closeTrade(); }
+  function syncFrom(source){
+    const txt=$('#txtAmount'), sld=$('#sldAmount');
+    if(source==='text') sld.value=Math.min(100,Math.max(0,+txt.value||0));
+    else if(source==='slider') txt.value=sld.value;
+  }
+</script>
+</body>
+</html>
