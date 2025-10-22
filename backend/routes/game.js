@@ -2,10 +2,7 @@ const express = require('express');
 const gameRoutes = express.Router();
 const api_key = process.env.POLYGON_API;
 const axios = require('axios');
-const app = express();
-app.use(express.json());
 const randomDate = require('../game-logic/gameLogic');
-const { parse } = require('path');
 let gameStarted = false;
 
 // game state
@@ -54,6 +51,7 @@ const fetchHistoricData = async (symbol, startDate, endDate) => {
 //     }
 // });
 
+// Start game route
 gameRoutes.post('/start-game', async (req, res) => {
     const { ticker } = req.body;
     const {startDate, endDate } = randomDate.getRandomDate();
@@ -71,6 +69,7 @@ gameRoutes.post('/start-game', async (req, res) => {
     res.json(gameState);
 });
 
+// Action route: buy, sell, hold, quit
 gameRoutes.post('/action', (req, res) => {
     const {action, amount} = req.body;
     const currentPrice = gameState.prices[gameState.currentDayIndex].finalPrice;
@@ -83,6 +82,7 @@ gameRoutes.post('/action', (req, res) => {
     if(gameStarted === false){
         return res.status(400).json({error: 'Game has not started. Please start a game by entering a valid ticker symbol.'});
     }
+    // Buy Action
     if(action === 'buy'){
         const totalCost = parseFloat((currentPrice * amount).toFixed(2));
         if(totalCost > gameState.bank){
@@ -95,6 +95,7 @@ gameRoutes.post('/action', (req, res) => {
         
 
     }
+    // Sell Action
     else if(action === 'sell'){
         if(amount > gameState.shares){
             return res.status(400).json({ error: 'Insufficient shares to complete sale.'});
@@ -104,17 +105,40 @@ gameRoutes.post('/action', (req, res) => {
         gameState.history.push({ action: 'sell', amount, price: currentPrice, date: gameState.prices[gameState.currentDayIndex].date });
         res.json({message: 'Sale successful', bank: gameState.bank, shares: gameState.shares });
     }
+    // Hold Action
     else if(action === 'hold'){
         gameState.history.push({ action: 'hold', amount: gameState.shares, price: currentPrice, date: gameState.prices[gameState.currentDayIndex].date });
         res.json({message: 'Hold successful', bank: gameState.bank, shares: gameState.shares});
     }
-    else if(action === 'quit'){
-        gameState.bank += parseFloat((currentPrice * gameState.shares).toFixed(2));
-        gameState.shares = 0;
-        gameStarted = false;
-        gameState.history.push({ action: 'quit', amount: gameState.shares, price: currentPrice, date: gameState.prices[gameState.currentDayIndex].date });
-        res.json({message: 'Game ended', bank: gameState.bank, shares: gameState.shares});
+    // Quit Action
+    else if (action === 'quit') {
+    const soldShares = gameState.shares;
+    gameState.bank += parseFloat((currentPrice * soldShares).toFixed(2));
+    gameState.shares = 0;
+    gameStarted = false;
+
+    const profitLoss = parseFloat((gameState.bank - 10000).toFixed(2));
+
+    gameState.history.push({
+        action: 'quit',
+        amount: soldShares,
+        price: currentPrice,
+        date: gameState.prices[gameState.currentDayIndex].date
+    });
+    // Summary Response
+    res.json({
+        message: 'Game ended',
+        gameOver: true,
+        summary: {
+            finalBalance: parseFloat(gameState.bank.toFixed(2)),
+            finalStockValue: 0,
+            totalPortfolioValue: parseFloat(gameState.bank.toFixed(2)),
+            profitLoss,
+            daysPlayed: gameState.currentDayIndex + 1
+        }
+    });
     }
+    // Invalid Action
     else {
         return res.status(400).json({ error: 'Invalid action specified.' });
     };
@@ -122,6 +146,7 @@ gameRoutes.post('/action', (req, res) => {
 
 });
 
+// Next day route
 gameRoutes.post('/next-day', (req, res) => {
     if (!gameStarted) {
         return res.status(400).json({ error: 'Game has not started. Please start a game by entering a valid ticker symbol.' });
@@ -133,7 +158,8 @@ gameRoutes.post('/next-day', (req, res) => {
         return res.json({
             message: 'Moved to next day.',
             currentDayIndex: gameState.currentDayIndex,
-            currentPrice: gameState.prices[gameState.currentDayIndex],
+            currentPrice: gameState.prices[gameState.currentDayIndex].finalPrice,
+            currentPriceDate: gameState.prices[gameState.currentDayIndex].date,
             bank: gameState.bank,
             shares: gameState.shares,
         });
@@ -146,5 +172,53 @@ gameRoutes.post('/next-day', (req, res) => {
         gameState,
     });
 });
+
+// Return current game state
+gameRoutes.get('/game-state', (req, res) => {
+    if(!gameStarted){
+        return res.status(400).json({error: 'Game has not started. Please start a game by entering valid ticker symbol.'});
+    }else{
+        res.json(gameState);
+    }
+});
+
+// Reset game route
+gameRoutes.post('/reset-game', (req, res) => {
+    if (gameStarted) {
+        console.warn('Resetting game while a session is active.');
+    };
+
+    gameStarted = false;
+    gameState = {
+        ticker: "",
+        startDate: "",
+        currentDayIndex: 0,
+        prices: [],
+        bank: 10000,
+        shares: 0,
+        history: [],
+    };
+    res.json({message: 'Game has been reset.', gameState});
+});
+
+// Return summary of current game state
+gameRoutes.get('/summary', (req, res) => {
+    if (!gameStarted) {
+        return res.status(400).json({ error: 'No active game.' });
+    }
+    const currentPrice = gameState.prices[gameState.currentDayIndex].finalPrice;
+    const portfolioValue = gameState.bank + (gameState.shares * currentPrice);
+    const profitLoss = parseFloat((portfolioValue - 10000).toFixed(2));
+
+    res.json({
+        ticker: gameState.ticker,
+        currentDay: gameState.currentDayIndex + 1,
+        bank: gameState.bank,
+        shares: gameState.shares,
+        portfolioValue,
+        profitLoss,
+    });
+});
+
 
 module.exports = gameRoutes;
