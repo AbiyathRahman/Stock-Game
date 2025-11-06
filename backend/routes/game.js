@@ -28,7 +28,9 @@ const fetchHistoricData = async (symbol, startDate, endDate) => {
         if(response.status !== 200){
             throw new Error(`Error fetching data: ${response.statusText}`);
         }
-        const data = response.data.results.slice(-7).map(item => ({
+        const results = Array.isArray(response.data.results) ? response.data.results : [];
+        results.sort((a, b) => a.t - b.t);
+        const data = results.map(item => ({
             finalPrice: item.c,
             date: new Date(item.t).toISOString().split('T')[0]
         }));
@@ -65,7 +67,7 @@ gameRoutes.post('/start-game', async (req, res) => {
     } catch(error){
         return res.status(500).json({ error: error.message });
     }
-    
+
     res.json(gameState);
 });
 
@@ -92,7 +94,7 @@ gameRoutes.post('/action', (req, res) => {
         gameState.shares += amount;
         gameState.history.push({ action: 'buy', amount, price: currentPrice, date: gameState.prices[gameState.currentDayIndex].date });
         res.json({message: 'Purchase successful', bank: gameState.bank, shares: gameState.shares });
-        
+
 
     }
     // Sell Action
@@ -112,37 +114,37 @@ gameRoutes.post('/action', (req, res) => {
     }
     // Quit Action
     else if (action === 'quit') {
-    const soldShares = gameState.shares;
-    gameState.bank += parseFloat((currentPrice * soldShares).toFixed(2));
-    gameState.shares = 0;
-    gameStarted = false;
+        const soldShares = gameState.shares;
+        gameState.bank += parseFloat((currentPrice * soldShares).toFixed(2));
+        gameState.shares = 0;
+        gameStarted = false;
 
-    const profitLoss = parseFloat((gameState.bank - 10000).toFixed(2));
+        const profitLoss = parseFloat((gameState.bank - 10000).toFixed(2));
 
-    gameState.history.push({
-        action: 'quit',
-        amount: soldShares,
-        price: currentPrice,
-        date: gameState.prices[gameState.currentDayIndex].date
-    });
-    // Summary Response
-    res.json({
-        message: 'Game ended',
-        gameOver: true,
-        summary: {
-            finalBalance: parseFloat(gameState.bank.toFixed(2)),
-            finalStockValue: 0,
-            totalPortfolioValue: parseFloat(gameState.bank.toFixed(2)),
-            profitLoss,
-            daysPlayed: gameState.currentDayIndex + 1
-        }
-    });
+        gameState.history.push({
+            action: 'quit',
+            amount: soldShares,
+            price: currentPrice,
+            date: gameState.prices[gameState.currentDayIndex].date
+        });
+        // Summary Response
+        res.json({
+            message: 'Game ended',
+            gameOver: true,
+            summary: {
+                finalBalance: parseFloat(gameState.bank.toFixed(2)),
+                finalStockValue: 0,
+                totalPortfolioValue: parseFloat(gameState.bank.toFixed(2)),
+                profitLoss,
+                daysPlayed: gameState.currentDayIndex + 1
+            }
+        });
     }
     // Invalid Action
     else {
         return res.status(400).json({ error: 'Invalid action specified.' });
     };
-    
+
 
 });
 
@@ -170,6 +172,7 @@ gameRoutes.post('/next-day', (req, res) => {
     return res.json({
         message: 'Game ended. No more data available.',
         gameState,
+        gameOver: true,
     });
 });
 
